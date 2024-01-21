@@ -6,3 +6,4 @@ datasets
 databricks
 ipykernel
 flask
+flask-cors

@@ -4,8 +4,10 @@ from werkzeug.utils import secure_filename
 from model import ResNetModel, inference
 import mlflow
 from PIL import Image
+from flask_cors import CORS
 
 app = Flask(__name__)
+CORS(app)
 # Configure the maximum upload size (for example, 16MB)
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
@@ -55,29 +57,36 @@ test = mlflow.pytorch.load_model(path)
 model = ResNetModel(15)
 model.load_state_dict(test.state_dict())
 app.config['MODEL'] = model
+
 @app.route('/api/predict', methods=['POST'])
 def my_api_function():
-    if 'file' not in request.files:
-        return jsonify({"error": "No file part"})
 
-    file = request.files['file']
+    files = request.files.getlist('files')
 
-    # If the user does not select a file, the browser submits an
-    # empty file without a filename.
-    if file.filename == '':
-        return jsonify({"error": "No selected file"})
+    if not files:
+        return jsonify({"error": "No files selected"})
 
-    if file and allowed_file(file.filename):
-        filename = secure_filename(file.filename)
-        file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-    else:
-        return 'Invalid file extension'
-    lst_images = []
-    for file in os.listdir(app.config['UPLOAD_FOLDER']):
+    image_list = []
+    for file in files:
+        if file and allowed_file(file.filename):
+            filename = secure_filename(file.filename)
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+            file.save(filepath)
+            image_list.append(Image.open(filepath))
+        else:
+            return jsonify({"error": "Invalid file type"})
 
-        lst_images.append(Image.open(file))
-    labels = inference(lst_images, app.config['MODEL'])
-    return labels
+    if not image_list:
+        return jsonify({"error": "No valid images processed"})
+
+    labels = inference(image_list, app.config['MODEL'])
+
+    # Optional: Clean up uploaded files after processing
+    for image in image_list:
+        os.remove(image.filename)
+
+    return jsonify(labels)
+
     
 if __name__ == '__main__':
     app.run(debug=True)
