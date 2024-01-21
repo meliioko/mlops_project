@@ -1,0 +1,8 @@
+torch
+torchvision
+pytorch-lightning
+mlflow
+datasets
+databricks
+ipykernel
+flask
