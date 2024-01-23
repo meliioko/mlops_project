@@ -7,3 +7,4 @@ databricks
 ipykernel
 flask
 flask-cors
+kafka-python
