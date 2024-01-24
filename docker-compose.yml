@@ -175,61 +175,17 @@ services:
       KAFKA_REST_LISTENERS: "http://0.0.0.0:8082"
       KAFKA_REST_SCHEMA_REGISTRY_URL: 'http://schema-registry:8081'
 
-  namenode:
-    image: apache/hadoop:3
-    hostname: namenode
-    command: ["hdfs", "namenode"]
+  mongo:
+    image: mongo
     ports:
-      - 9870:9870
-      - 8020:8020
-    env_file:
-      - ./config
-    environment:
-        ENSURE_NAMENODE_DIR: "/tmp/hadoop-root/dfs/name"
-    depends_on:
-      - datanode
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-    
-  datanode:
-    image: apache/hadoop:3.3.6
-    command: ["hdfs", "datanode"]
-    env_file:
-      - ./config
-    depends_on:
-      - rest-proxy
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
-
-  resourcemanager:
-    image: apache/hadoop:3.3.6
-    hostname: resourcemanager
-    command: ["yarn", "resourcemanager"]
-    ports:
-        - 8089:8089
-    env_file:
-      - ./config
+      - 27017:27017
     volumes:
-      - ./test.sh:/opt/test.sh
+      - mongo-data:/data/db
+    environment:
+      MONGO_INITDB_DATABASE: human-action
     depends_on:
-      - datanode
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
+      - control-center
 
-  nodemanager:
-    image: apache/hadoop:3.3.6
-    command: ["yarn", "nodemanager"]
-    env_file:
-      - ./config
-    depends_on:
-      - datanode
-    ulimits:
-      nofile:
-        soft: 65536
-        hard: 65536
+volumes:
+  mongo-data:
+

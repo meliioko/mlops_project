@@ -8,3 +8,4 @@ ipykernel
 flask
 flask-cors
 kafka-python
+pymongo

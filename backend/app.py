@@ -1,3 +1,4 @@
+import torch
 from flask import Flask, jsonify, request, redirect
 import os
 from werkzeug.utils import secure_filename
@@ -5,6 +6,21 @@ from model import ResNetModel, inference
 import mlflow
 from PIL import Image
 from flask_cors import CORS
+import json
+from kafka import KafkaProducer
+import uuid
+
+# Kafka configuration
+KAFKA_BROKER_URL = 'localhost:9092'  # Modify with your Kafka broker address
+KAFKA_TOPIC = 'Human_action'  # Modify with your Kafka topic name
+
+# Set up Kafka producer
+producer = KafkaProducer(
+    bootstrap_servers=[KAFKA_BROKER_URL],
+    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+)
+
+
 
 app = Flask(__name__)
 CORS(app)
@@ -32,11 +48,10 @@ def allowed_file(filename):
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
-path = 'dbfs:/databricks/mlflow-tracking/2713494469571469/672969b1bd224ad49cd2c0853ea51a80/artifacts/model/'
-test = mlflow.pytorch.load_model(path)
+path = 'model.pth'
 
 model = ResNetModel(15)
-model.load_state_dict(test.state_dict())
+model.load_state_dict(torch.load(path))
 app.config['MODEL'] = model
 
 @app.route('/api/predict', methods=['POST'])
@@ -68,6 +83,32 @@ def my_api_function():
 
     return jsonify(labels)
 
-    
+
+@app.route('/api/send-to-kafka', methods=['POST'])
+def send_to_kafka():
+    file = request.files['file']
+    if file and allowed_file(file.filename):
+        original_filename, file_extension = os.path.splitext(secure_filename(file.filename))
+
+        # Keep generating new filenames until a unique one is found
+        while True:
+            unique_id = uuid.uuid4().hex
+            new_filename = f"{original_filename}_{unique_id}{file_extension}"
+            filepath = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
+
+            # Check if the new filename already exists
+            if not os.path.exists(filepath):
+                break  # Unique filename found, exit the loop
+
+        # Save the file with the unique filename
+        file.save(filepath)
+
+        # Send the new filename to Kafka
+        message = {'filename': new_filename, 'message': 'Image received'}
+        producer.send(KAFKA_TOPIC, value=message)
+
+        return jsonify({"message": "Image sent to Kafka successfully", "id":new_filename}), 200
+    else:
+        return jsonify({"error": "Invalid file type"}), 400
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
