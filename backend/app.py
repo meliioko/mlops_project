@@ -9,9 +9,11 @@ from flask_cors import CORS
 import json
 from kafka import KafkaProducer
 import uuid
+import pymongo
+
 
 # Kafka configuration
-KAFKA_BROKER_URL = 'localhost:9092'  # Modify with your Kafka broker address
+KAFKA_BROKER_URL = '51.178.53.42:9092'  # Modify with your Kafka broker address
 KAFKA_TOPIC = 'Human_action'  # Modify with your Kafka topic name
 
 # Set up Kafka producer
@@ -20,7 +22,8 @@ producer = KafkaProducer(
     value_serializer=lambda v: json.dumps(v).encode('utf-8')
 )
 
-
+client = pymongo.MongoClient("mongodb://localhost:27017/")  # Modify with your MongoDB connection string
+db = client["human-action"]  # Replace with your database name
 
 app = Flask(__name__)
 CORS(app)
@@ -110,5 +113,13 @@ def send_to_kafka():
         return jsonify({"message": "Image sent to Kafka successfully", "id":new_filename}), 200
     else:
         return jsonify({"error": "Invalid file type"}), 400
+
+@app.route('/api/acquire/<name_id>', methods=['GET'])
+def acquire(name_id):
+    res = db.results.find_one({'filename': name_id})
+    del res['_id']
+    return jsonify(res), 200
+
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
